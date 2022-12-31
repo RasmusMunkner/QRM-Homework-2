@@ -191,6 +191,7 @@ StockData <- inner_join(Bmw, Dax, by = "Day", suffix = c("Bmw", "Dax")) %>%
   
   #Generally speaking, the plots show that optimizing wrt. loglikelihood yields much too
   #light tails (all the blue points are in the center of the distribution)
+  #The eyeballed df = 5 fit looks better, but the covariance seems to be off
   plotdata <- lrSim %>% reduce(cbind) %>% t() %>% magrittr::set_colnames(c("LRBmw", "LRDax")) %>%
     as_tibble()
   
@@ -202,9 +203,41 @@ StockData <- inner_join(Bmw, Dax, by = "Day", suffix = c("Bmw", "Dax")) %>%
     geom_point(mapping = aes(x = plotdata$LRBmw, y = plotdata$LRDax), color = "blue") +
     geom_point(mapping = aes(x = StockData$LRBmw, y = StockData$LRDax))
   
+  
+  if(exists("CalculateLoss") == F || exists("EmpEs") == F){
+    warning("The function(s) CalculateLoss/EmpEs are not loaded. They can be found in the Ex1 code.")
+  } else {
+    #Calculate simulated losses
+    simLosses <- 
+      lrSimFake %>% 
+      map_dbl(.f = CalculateLoss)
+    
+    #Calculate empirical VaR and ES
+    quantile(simLosses, 0.99, type = 1) %>% paste("VaR:", .) %>%  print()
+    EmpEs(simLosses, 0.99) %>% paste("ES:", .) %>% print()
+  }
+  
 } #Solving the exercise
 
-
+{
+  
+  m_hat <- 
+    StockData %>% 
+    select(-Day) %>% 
+    colMeans()
+  
+  S_hat <- StockData %>% 
+    select(-Day) %>% 
+    cov()
+  
+  mu_hat <- t(-c(100, 100)) %*% m_hat
+  
+  sigma_hat <- t(-c(100, 100)) %*% S_hat %*% (-c(100, 100))
+  
+  VaR_vc <- mu_hat + sigma_hat * qnorm(0.99)
+  
+  
+}#Variance-Covariance implementation
 
 
 
