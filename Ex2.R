@@ -239,5 +239,110 @@ StockData <- inner_join(Bmw, Dax, by = "Day", suffix = c("Bmw", "Dax")) %>%
   
 }#Variance-Covariance implementation
 
+{
+  
+  StockData %>% 
+    ggplot(aes(x = LRDax)) +
+    geom_histogram()
+  
+  StockData %>% 
+    ggplot(aes(x = LRBmw)) +
+    geom_histogram()
+  
+  BmwFit <- 
+  StockData[["LRBmw"]] %>% 
+    fitdistr(densfun = "t")
+  
+  DaxFit <- 
+  StockData[["LRDax"]] %>% 
+    fitdistr(densfun = "t")
+  
+  xForPlot <- seq(-0.1, 0.1, 0.001)
+  yBmw <- xForPlot %>%
+    as.list() %>% 
+    map_dbl(.f = function(x){
+      (x - BmwFit$estimate["m"])/BmwFit$estimate["s"]}
+    ) %>%
+    map_dbl(.f = dt, df = BmwFit$estimate["df"]) %>% 
+    `*`(1700)
+  
+  yDax <- xForPlot %>%
+    as.list() %>% 
+    map_dbl(.f = function(x){
+      (x - DaxFit$estimate["m"])/DaxFit$estimate["s"]}
+    ) %>%
+    map_dbl(.f = dt, df = DaxFit$estimate["df"]) %>% 
+    `*`(1700)
+  
+  #Looking pretty good
+  ggplot() +
+    geom_histogram(mapping = aes(x = StockData$LRBmw)) +
+    geom_line(mapping = aes(x = xForPlot, y = yBmw), color = "red")
+  
+  ggplot() +
+    geom_histogram(mapping = aes(x = StockData$LRDax)) +
+    geom_line(mapping = aes(x = xForPlot, y = yDax), color = "red")
+    
+  StockData <- 
+  StockData %>% 
+    mutate(UDax = pt((LRDax - DaxFit$estimate["m"])/DaxFit$estimate["s"], df = DaxFit$estimate["df"]),
+           UBmw = pt((LRBmw - BmwFit$estimate["m"])/BmwFit$estimate["s"], df = BmwFit$estimate["df"]))
+  
+  ggplot(StockData, aes(x = UDax, y = UBmw)) +
+    geom_point()
+  
+  
+  #Likelihood for a Generalized Clayton copula
+  #theta >= 0, delta >= 1
+  
+  phi_gc <- function(t,delta,theta){
+    (1 + theta * t^(1/delta))
+  }
+  
+  phi_gc_inv <- function(u,delta,theta){
+    (u^(-theta) / theta - 1)^(delta)
+  }
+  
+  phi_gc_prime <- function(t, delta, theta){
+    -1/delta * (1 + theta * t^(1/delta)) * t^(1/delta - 1)
+  }
+  
+  phi_gc_primeprime <- funcition(t,delta,theta){
+    -delta * (1 + theta * t^(1/delta))^(-1/theta - 2)(-1/theta - 1) * t^(1/delta - 1) * theta * (1/delta) * t^(1/delta - 1) +
+      -1/delta * (1 + theta * t^(1/delta))^(-1/theta - 1) * (1/delta - 1)*t^(1/delta - 2)
+  }
+  
+  likelihood <- function(u_1, u_2, delta, theta){
+    return(
+    phi_gc_primeprime(
+      phi_gc_inv(u_1, delta, theta) + phi_gc_inv(u_2, delta, theta)
+      , delta, theta) / 
+      phi_gc_prime(phi_gc_inv(u_1, delta, theta), delta, theta) /
+      phi_gc_prime(phi_gc_inv(u_2, delta, theta), delta, theta)
+    )
+  }
+  
+  TileSearch(lowerLimits, upperLimits, objective, subdivisions = 1, iterations = 10){
+    d <- length(lowerLimits)
+    alpha_midpoint <- seq(1/(subdivisions + 1), subdivisions / (subdivisions + 1), 1/(subdivisions + 1))
+    
+    evals <- 
+    1:d %>% 
+      map(.f = function(i){
+        alpha_midpoint %>% 
+          map_dbl(.f = function(alpha){
+            lowerLimit[i] * (1-alpha) + upperLimit[i] * (alpha)
+          })
+      })
+    
+    #Noget med at loope over alle (d)^(subdivisions) punkter og tage det bedste og køre optimizeren rekursivt herfra
+    
+    
+    
+  }
+  
+  
+  
+} #Copula approach
 
 
