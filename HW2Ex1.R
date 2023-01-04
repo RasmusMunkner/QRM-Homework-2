@@ -38,8 +38,12 @@ library(tidyverse)
 } #General helper functions
 
 {
+  #Find the suitable linear correlation for having Kendall's tau = 0.4
+  #Using (Theorem 7.42, MFE)
+  rhoTarget <- (0.4 * pi / 2) %>% sin()
+  
   #Function for constructing the covariance matrix
-  MakeCovarianceMatrix <- function(covar = 0.4, dim = 50){
+  MakeCovarianceMatrix <- function(covar = rhoTarget, dim = 50){
     Sigma <- matrix(rep(covar, dim^2), nrow = dim)
     for (i in 1:dim){
       Sigma[i,i] <- 1
@@ -53,7 +57,7 @@ library(tidyverse)
   }
   
   #Function for simulating from a Gaussian copula with t-marginals
-  SimulateGaussianCopula <- function(nsim = 10, dim = 50, covar = 0.4){
+  SimulateGaussianCopula <- function(nsim = 10, dim = 50, covar = rhoTarget){
     Z <- MASS::mvrnorm(nsim, rep(0,dim), MakeCovarianceMatrix(covar = covar, dim = dim))
     Y <- map(.x = Z %>% t() %>% as.data.frame() %>% as.list(), .f = NormalizeMarginals)
     return(Y)
@@ -79,8 +83,12 @@ library(tidyverse)
 } #Helper functions for Gaussian copula simulation
 
 {
+  #The theta ensuring the kendall tau is 0.4
+  #Using (Table 7.5, MFE)
+  ThetaTarget <- 2 * 0.4/(1-0.4)
+  
   #Parametrization is taken from p.260 MFE
-  PhiClayton <- function(t, theta = 1){
+  PhiClayton <- function(t, theta = ThetaTarget){
     return(
       (1+theta * t)^(-1/theta)
       )
@@ -90,7 +98,7 @@ library(tidyverse)
     geom_point()
   
   #Function for simulating from the Clayton copula (see Algorithm 7.52, MFE)
-  SimulateClayton <- function(nsim = 10, dim = 50, theta = 1){
+  SimulateClayton <- function(nsim = 10, dim = 50, theta = ThetaTarget){
     V <- rgamma(nsim, 1/theta, 1) %>% as.list()
     Y <- 
       rgamma(nsim * dim, 1, 1) %>%
@@ -109,15 +117,15 @@ library(tidyverse)
 
 {
   set.seed(28122022)
-  GaussCoula <- SimulateGaussianCopula(nsim = 10^4) %>%
+  GaussCopula <- SimulateGaussianCopula(nsim = 10^4) %>%
     map(.f = TransformMarginals) %>% 
     map(.f = function(X){return(X / 100 / sqrt(3))})
   set.seed(NULL)
-  GaussLosses <- map_dbl(.x = GaussCoula, .f = CalculateLoss)
+  GaussLosses <- map_dbl(.x = GaussCopula, .f = CalculateLoss)
   
   #Just for sanity checking
-  PairwiseDependencePlot(GaussCoula) #Low tail dependence
-  hist(GaussLosses[GaussLosses > 0])
+  PairwiseDependencePlot(GaussCopula) #Low tail dependence
+  hist(GaussLosses[GaussLosses > 0], breaks = 50)
   
   quantile(GaussLosses, 0.99, type = 1) #VaR
   EmpEs(GaussLosses, 0.99) #ES
@@ -131,7 +139,7 @@ library(tidyverse)
   
   #Just for sanity checking
   PairwiseDependencePlot(ClaytonCopula) #More tail dependence
-  hist(ClaytonLosses[ClaytonLosses > 0])
+  hist(ClaytonLosses[ClaytonLosses > 0], breaks = 50)
   
   quantile(ClaytonLosses, 0.99, type = 1) #VaR
   EmpEs(ClaytonLosses, 0.99) #ES

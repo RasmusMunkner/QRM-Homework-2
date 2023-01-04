@@ -1,5 +1,6 @@
 
 library(tidyverse)
+library(MASS)
 
 Bmw <- read_tsv("Data/bmw_returns.txt")
 
@@ -307,8 +308,8 @@ StockData <- inner_join(Bmw, Dax, by = "Day", suffix = c("Bmw", "Dax")) %>%
     -1/delta * (1 + theta * t^(1/delta)) * t^(1/delta - 1)
   }
   
-  phi_gc_primeprime <- funcition(t,delta,theta){
-    -delta * (1 + theta * t^(1/delta))^(-1/theta - 2)(-1/theta - 1) * t^(1/delta - 1) * theta * (1/delta) * t^(1/delta - 1) +
+  phi_gc_primeprime <- function(t,delta,theta){
+    -delta * (1 + theta * t^(1/delta))^(-1/theta - 2)*(-1/theta - 1) * t^(1/delta - 1) * theta * (1/delta) * t^(1/delta - 1) +
       -1/delta * (1 + theta * t^(1/delta))^(-1/theta - 1) * (1/delta - 1)*t^(1/delta - 2)
   }
   
@@ -322,26 +323,104 @@ StockData <- inner_join(Bmw, Dax, by = "Day", suffix = c("Bmw", "Dax")) %>%
     )
   }
   
-  TileSearch(lowerLimits, upperLimits, objective, subdivisions = 1, iterations = 10){
+  TileSearch <- function(lowerLimits, upperLimits, objective, subdivisions = 1, iterations = 4){
+    if(iterations == 4){
+      #browser()
+    }
     d <- length(lowerLimits)
+    repLengthForThisRun <- subdivisions + 1
     alpha_midpoint <- seq(1/(subdivisions + 1), subdivisions / (subdivisions + 1), 1/(subdivisions + 1))
     
     evals <- 
     1:d %>% 
       map(.f = function(i){
-        alpha_midpoint %>% 
+        map2(.x=c(0, alpha_midpoint), .y = c(alpha_midpoint, 1), .f = function(x,y){(x+y)/2}) %>% 
           map_dbl(.f = function(alpha){
-            lowerLimit[i] * (1-alpha) + upperLimit[i] * (alpha)
+            lowerLimits[i] * (1-alpha) + upperLimits[i] * (alpha)
           })
       })
     
-    #Noget med at loope over alle (d)^(subdivisions) punkter og tage det bedste og køre optimizeren rekursivt herfra
+    #Noget med at loope over alle punkter og tage det bedste og køre optimizeren rekursivt herfra
     
+    results <- 
+      (0:((subdivisions + 1)^d-1)) %>% 
+      map(.f = BaseD, repLength = repLengthForThisRun) %>% 
+      map_dbl(.f = function(index){
+        map2_dbl(.x = evals, .y = index, .f = .subset2) %>% objective()
+      })
     
+    bestResultIndex <- which.max(results)
+    
+    diag <- (upperLimits - lowerLimits) / (subdivisions + 1)
+    
+    newLowerBound <- map2_dbl(.x = evals, .y = BaseD(bestResultIndex - 1, d, repLengthForThisRun), .f = .subset2) - diag/2
+    newUpperBound <- map2_dbl(.x = evals, .y = BaseD(bestResultIndex - 1, d, repLengthForThisRun), .f = .subset2) + diag/2
+    
+    if(iterations > 0){
+      return(TileSearch(newLowerBound, newUpperBound, objective, subdivisions, iterations - 1))
+    }
+    else {
+      return((newLowerBound + newUpperBound) / 2)
+    }
     
   }
   
+  testFunc <- function(x){
+    -(x[1] - 2)^2 - (x[2] - 3)^2
+  }
   
+  TileSearch(c(2,2), c(3,3), testFunc, iterations = 20)
+  
+  objectiveFunction <- function(params){
+    Observations %>% 
+    map_dbl(.f = function(obs){
+      likelihood(obs[1], obs[2], params[1], params[2])
+    }) %>% 
+      prod()
+  }
+  
+  likelihood(5, 2, 2, 5)
+  
+  objectiveFunction(c(4,5))
+  
+  Observations %>% 
+    map_dbl(.f = function(obs){
+      likelihood(obs[1], obs[2], 3, 3)
+    }) %>% 
+    prod()
+  
+  Observations <- 
+  StockData %>% 
+    dplyr::select(UDax, UBmw) %>% 
+    as.list() %>% 
+    transpose() %>% 
+    map(.f = unlist)
+  
+  
+  
+  #Produces the base-d representation of a given integer
+  BaseD <- function(x, d = 2, repLength = NULL, rIndex = T){
+    
+    #Decide the length of the base-d representation
+    if(is.null(repLength)){
+      finalPower <- log(x, base = d) %>% ceiling()
+    }
+    else {
+      finalPower <- repLength
+    }
+    
+    #Calculate the base-d representation
+    baseRep <- map_dbl(.x = 1:finalPower, .f = function(k){
+      (x %% (d^k) - x %% (d^(k-1))) / d^(k-1)
+      })
+    if(rIndex == F){
+      return(baseRep)
+    }
+    else {
+      return(baseRep + 1)
+    }
+    
+  }
   
 } #Copula approach
 
