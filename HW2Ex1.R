@@ -117,7 +117,7 @@ library(tidyverse)
 
 {
   set.seed(28122022)
-  GaussCopula <- SimulateGaussianCopula(nsim = 10^4) %>%
+  GaussCopula <- SimulateGaussianCopula(nsim = 10^6) %>%
     map(.f = TransformMarginals) %>% 
     map(.f = function(X){return(X / 100 / sqrt(3))})
   set.seed(NULL)
@@ -131,7 +131,7 @@ library(tidyverse)
   EmpEs(GaussLosses, 0.99) #ES
   
   set.seed(28122022)
-  ClaytonCopula <- SimulateClayton(nsim = 10^4) %>% 
+  ClaytonCopula <- SimulateClayton(nsim = 10^6) %>% 
     map(.f = TransformMarginals) %>%
     map(.f = function(X){return(X / 100 / sqrt(3))})
   set.seed(NULL)

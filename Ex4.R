@@ -41,5 +41,19 @@ CubeEval <- function(a,b,f = C_tilde){
   
 }
 
+#Check that stuff breaks down for sqrt(1/3)
 CubeEval( a = c(sqrt(1/3), sqrt(1/3), sqrt(1/3)), b = c(1,1,1))
+
+#A lille extra for visualization
+wrapper <- function(x, f){
+  CubeEval(a = rep(x, 3), b = rep(1,3), f = f)
+}
+
+library(tidyverse)
+w <- seq(0.001, 1, 0.0001)
+fw <- map_dbl(.x = w, .f = wrapper, f = C_tilde)
+ggplot() +
+  geom_point(mapping = aes(x = w, y = fw)) +
+  geom_vline(xintercept = (-1 + sqrt(5))/2)
+
 
